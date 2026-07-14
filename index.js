@@ -113,3 +113,22 @@ app.get('/', (req, res) => res.json({ ok: true, service: 'sefaz-proxy' }))
 
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => console.log(`Proxy rodando na porta ${PORT}`))
+
+app.get('/test-urls', async (req, res) => {
+  const urls = [
+    'https://nfce-homologacao.svrs.rs.gov.br/ws/NfceAutorizacao/NfceAutorizacao4.asmx',
+    'https://nfce.svrs.rs.gov.br/ws/NfceAutorizacao/NfceAutorizacao4.asmx',
+  ]
+
+  const results = {}
+  for (const url of urls) {
+    try {
+      const r = await httpsRequest(url, { method: 'GET', headers: {} }, null)
+      results[url] = { status: r.status, body: r.body.substring(0, 100) }
+    } catch (e) {
+      results[url] = { error: e.message }
+    }
+  }
+
+  res.json(results)
+})
