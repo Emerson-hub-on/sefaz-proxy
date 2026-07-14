@@ -7,7 +7,6 @@ app.use(express.text({ type: '*/*', limit: '10mb' }))
 
 const PROXY_SECRET = process.env.PROXY_SECRET
 
-// Faz requisição HTTP/HTTPS ignorando validação de certificado ICP-Brasil
 function httpsRequest(url, options, body) {
   return new Promise((resolve, reject) => {
     const parsedUrl = new URL(url)
@@ -19,7 +18,10 @@ function httpsRequest(url, options, body) {
       path:               parsedUrl.pathname + parsedUrl.search,
       method:             options.method ?? 'POST',
       headers:            options.headers ?? {},
-      rejectUnauthorized: false, // ← aceita ICP-Brasil
+      rejectUnauthorized: false,
+      // Certificado do cliente para mTLS
+      pfx:                options.pfx,
+      passphrase:         options.passphrase,
     }
 
     const req = lib.request(reqOptions, (res) => {
@@ -40,13 +42,23 @@ app.post('/proxy-sefaz', async (req, res) => {
   }
 
   const targetUrl = req.headers['x-target-url']
+  const pfxBase64 = req.headers['x-pfx-base64']
+  const pfxSenha  = req.headers['x-pfx-senha']
+
+  console.log('[proxy] targetUrl:', targetUrl)
+  console.log('[proxy] pfxBase64 length:', pfxBase64?.length ?? 0)
+  console.log('[proxy] pfxSenha length:', pfxSenha?.length ?? 0)
+  console.log('[proxy] body length:', req.body?.length ?? 0)
+
   if (!targetUrl) {
     return res.status(400).json({ error: 'x-target-url obrigatório' })
   }
 
-  console.log('[proxy-sefaz] →', targetUrl)
-
   try {
+    const pfxBuffer = pfxBase64 ? Buffer.from(pfxBase64, 'base64') : undefined
+    console.log('[proxy] pfxBuffer size:', pfxBuffer?.length ?? 0)
+    console.log('[proxy] pfxBuffer magic byte:', pfxBuffer ? pfxBuffer[0].toString(16) : 'N/A')
+
     const result = await httpsRequest(
       targetUrl,
       {
@@ -56,20 +68,21 @@ app.post('/proxy-sefaz', async (req, res) => {
           'SOAPAction':   req.headers['soapaction'] ?? '',
           'Content-Length': Buffer.byteLength(req.body),
         },
+        pfx:        pfxBuffer,
+        passphrase: pfxSenha,
       },
       req.body
     )
 
-    console.log('[proxy-sefaz] status:', result.status)
-    console.log('[proxy-sefaz] cStat:', result.body.match(/<cStat>(\d+)<\/cStat>/)?.[1])
+    console.log('[proxy] SEFAZ status:', result.status)
+    console.log('[proxy] SEFAZ body (200 chars):', result.body.substring(0, 200))
     res.status(result.status).type('xml').send(result.body)
   } catch (e) {
-    console.error('[proxy-sefaz] erro:', e.message)
+    console.error('[proxy] erro:', e.message)
     res.status(502).json({ error: e.message })
   }
 })
 
-// Diagnóstico
 app.get('/test-sefaz', async (req, res) => {
   const results = {}
 
@@ -90,13 +103,6 @@ app.get('/test-sefaz', async (req, res) => {
     results.https = { ok: true, status: result.status }
   } catch (e) {
     results.https = { ok: false, error: e.message }
-  }
-
-  try {
-    const result = await httpsRequest('https://www.google.com', { method: 'GET', headers: {} }, null)
-    results.google = { ok: true, status: result.status }
-  } catch (e) {
-    results.google = { ok: false, error: e.message }
   }
 
   console.log('[test-sefaz]', JSON.stringify(results))
