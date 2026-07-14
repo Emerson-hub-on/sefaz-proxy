@@ -1,9 +1,13 @@
 const express = require('express')
+const https   = require('https')
 const app = express()
 
 app.use(express.text({ type: '*/*', limit: '10mb' }))
 
 const PROXY_SECRET = process.env.PROXY_SECRET
+
+// Agente HTTPS que aceita certificados ICP-Brasil
+const sefazAgent = new https.Agent({ rejectUnauthorized: false })
 
 app.post('/proxy-sefaz', async (req, res) => {
   if (req.headers['x-proxy-secret'] !== PROXY_SECRET) {
@@ -24,7 +28,8 @@ app.post('/proxy-sefaz', async (req, res) => {
         'Content-Type': req.headers['content-type'] ?? 'application/soap+xml',
         'SOAPAction':   req.headers['soapaction'] ?? '',
       },
-      body: req.body,
+      body:  req.body,
+      agent: sefazAgent, // ← aceita ICP-Brasil
     })
 
     const text = await sefazResp.text()
@@ -36,11 +41,10 @@ app.post('/proxy-sefaz', async (req, res) => {
   }
 })
 
-// Rota de diagnóstico de rede
+// Diagnóstico
 app.get('/test-sefaz', async (req, res) => {
   const results = {}
 
-  // Teste 1: DNS resolve?
   try {
     const dns = await import('dns/promises')
     const addresses = await dns.lookup('nfce.svrs.rs.gov.br')
@@ -49,10 +53,10 @@ app.get('/test-sefaz', async (req, res) => {
     results.dns = { ok: false, error: e.message }
   }
 
-  // Teste 2: HTTPS conecta?
   try {
     const resp = await fetch('https://nfce.svrs.rs.gov.br/ws/NfceAutorizacao/NfceAutorizacao4.asmx', {
       method: 'GET',
+      agent:  sefazAgent,
       signal: AbortSignal.timeout(10000),
     })
     results.https = { ok: true, status: resp.status }
@@ -60,7 +64,6 @@ app.get('/test-sefaz', async (req, res) => {
     results.https = { ok: false, error: e.message, cause: e.cause?.message }
   }
 
-  // Teste 3: Google acessível? (confirma que rede funciona)
   try {
     const resp = await fetch('https://www.google.com', {
       signal: AbortSignal.timeout(5000),
@@ -74,7 +77,6 @@ app.get('/test-sefaz', async (req, res) => {
   res.json(results)
 })
 
-// Health check
 app.get('/', (req, res) => res.json({ ok: true, service: 'sefaz-proxy' }))
 
 const PORT = process.env.PORT || 3001
