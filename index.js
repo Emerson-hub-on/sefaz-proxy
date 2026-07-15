@@ -67,19 +67,21 @@ app.post('/proxy-sefaz', async (req, res) => {
     console.log('[proxy] pfxBuffer size:', pfxBuffer?.length ?? 0)
     console.log('[proxy] pfxBuffer magic byte:', pfxBuffer ? pfxBuffer[0].toString(16) : 'N/A')
 
+    const bodyBuffer = Buffer.from(req.body, 'utf-8')  // garante encoding correto
+
     const result = await httpsRequest(
-      targetUrl,
-      {
+    targetUrl,
+    {
         method: 'POST',
         headers: {
-          'Content-Type': req.headers['content-type'] ?? 'application/soap+xml',
-          'SOAPAction':   req.headers['soapaction'] ?? '',
-          'Content-Length': Buffer.byteLength(req.body),
+        'Content-Type': req.headers['content-type'] ?? 'text/xml; charset=utf-8',
+        'SOAPAction':   req.headers['soapaction'] ?? '',
+        'Content-Length': bodyBuffer.length,  // ← usa o buffer, não req.body.length
         },
         pfx:        pfxBuffer,
         passphrase: pfxSenha,
-      },
-      req.body
+    },
+    bodyBuffer  // ← passa o buffer, não a string
     )
 
     console.log('[proxy] SEFAZ status:', result.status)
