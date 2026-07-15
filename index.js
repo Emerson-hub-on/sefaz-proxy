@@ -49,6 +49,11 @@ app.post('/proxy-sefaz', async (req, res) => {
   console.log('[proxy] pfxBase64 length:', pfxBase64?.length ?? 0)
   console.log('[proxy] pfxSenha length:', pfxSenha?.length ?? 0)
   console.log('[proxy] body length:', req.body?.length ?? 0)
+  // ── LOG TEMPORÁRIO ──
+  console.log('[proxy] Content-Type enviado:', req.headers['content-type'])
+  console.log('[proxy] SOAPAction enviado:', req.headers['soapaction'])
+  console.log('[proxy] body (primeiros 1000 chars):\n', req.body?.substring(0, 1000))
+  // ───────────────────
 
   if (!targetUrl) {
     return res.status(400).json({ error: 'x-target-url obrigatório' })
@@ -75,7 +80,7 @@ app.post('/proxy-sefaz', async (req, res) => {
     )
 
     console.log('[proxy] SEFAZ status:', result.status)
-    console.log('[proxy] SEFAZ body (200 chars):', result.body.substring(0, 200))
+    console.log('[proxy] SEFAZ body completo:\n', result.body.substring(0, 2000))
     res.status(result.status).type('xml').send(result.body)
   } catch (e) {
     console.error('[proxy] erro:', e.message)
