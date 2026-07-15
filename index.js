@@ -19,7 +19,6 @@ function httpsRequest(url, options, body) {
       method:             options.method ?? 'POST',
       headers:            options.headers ?? {},
       rejectUnauthorized: false,
-      // Certificado do cliente para mTLS
       pfx:                options.pfx,
       passphrase:         options.passphrase,
     }
@@ -27,7 +26,11 @@ function httpsRequest(url, options, body) {
     const req = lib.request(reqOptions, (res) => {
       let data = ''
       res.on('data', chunk => { data += chunk })
-      res.on('end', () => resolve({ status: res.statusCode, body: data }))
+      res.on('end', () => resolve({
+        status:  res.statusCode,
+        headers: res.headers, // ← adicione
+        body:    data,
+      }))
     })
 
     req.on('error', reject)
@@ -80,6 +83,7 @@ app.post('/proxy-sefaz', async (req, res) => {
     )
 
     console.log('[proxy] SEFAZ status:', result.status)
+    console.log('[proxy] SEFAZ headers:', JSON.stringify(result.headers)) // ← adicione
     console.log('[proxy] SEFAZ body completo:\n', result.body.substring(0, 2000))
     res.status(result.status).type('xml').send(result.body)
   } catch (e) {
