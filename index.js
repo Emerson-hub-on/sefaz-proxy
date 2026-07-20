@@ -55,7 +55,7 @@ app.post('/proxy-sefaz', async (req, res) => {
   // ── LOG TEMPORÁRIO ──
   console.log('[proxy] Content-Type enviado:', req.headers['content-type'])
   console.log('[proxy] SOAPAction enviado:', req.headers['soapaction'])
-  console.log('[proxy] body (primeiros 1000 chars):\n', req.body?.substring(0, 1000))
+  console.log('[proxy] body COMPLETO:\n', req.body)
   // ───────────────────
 
   if (!targetUrl) {
