@@ -92,6 +92,21 @@ app.post('/proxy-sefaz', async (req, res) => {
     console.error('[proxy] erro:', e.message)
     res.status(502).json({ error: e.message })
   }
+  const result = await httpsRequest(/* ... */)
+
+  console.log('[proxy] SEFAZ status:', result.status)
+  console.log('[proxy] SEFAZ response headers:', JSON.stringify(result.headers, null, 2))
+  console.log('[proxy] SEFAZ body:', result.body || '(vazio)')
+
+  // Também loga o que foi enviado para a SEFAZ
+  console.log('[proxy] REQUEST headers enviados:', JSON.stringify({
+    'Content-Type': req.headers['content-type'],
+    'SOAPAction':   req.headers['soapaction'],
+    'Content-Length': Buffer.byteLength(req.body),
+  }))
+  console.log('[proxy] REQUEST body completo:\n', req.body)
+
+  res.status(result.status).type('xml').send(result.body)
 })
 
 app.get('/test-sefaz', async (req, res) => {
